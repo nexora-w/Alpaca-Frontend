@@ -13,16 +13,16 @@ export default function RootLayout() {
 
   return (
     <Provider store={store}>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack>
-          <Stack.Screen name="index" options={{ headerShown: false }} />
+    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <Stack>
+        <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="wallet" options={{ headerShown: false }} />
-          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-          <Stack.Screen name="create-wallet" options={{ presentation: 'modal', title: 'Create Wallet' }} />
-          <Stack.Screen name="import-wallet" options={{ presentation: 'modal', title: 'Import Wallet' }} />
-        </Stack>
-        <StatusBar style="auto" />
-      </ThemeProvider>
+        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+        <Stack.Screen name="create-wallet" options={{ presentation: 'modal', title: 'Create Wallet' }} />
+        <Stack.Screen name="import-wallet" options={{ presentation: 'modal', title: 'Import Wallet' }} />
+      </Stack>
+      <StatusBar style="auto" />
+    </ThemeProvider>
     </Provider>
   );
 }

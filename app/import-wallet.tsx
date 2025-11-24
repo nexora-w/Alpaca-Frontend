@@ -2,32 +2,41 @@ import { useState } from 'react';
 import { ScrollView, Alert, ActivityIndicator, TextInput, TouchableOpacity, View, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { importWalletFromSeed, importWalletFromMnemonic } from '@/store/slices/walletSlice';
+import { importWalletFromMnemonic } from '@/store/slices/walletSlice';
 import { walletApi } from '@/services/api';
 import { saveWallet } from '@/services/walletStorage';
 
-type ImportMethod = 'seed' | 'mnemonic' | 'privateKey';
+type ImportMethod = 'mnemonic' | 'privateKey';
+const TOTAL_MNEMONIC_WORDS = 24;
 
 export default function ImportWalletScreen() {
   const dispatch = useAppDispatch();
   const { loading, error, walletData } = useAppSelector((state) => state.wallet);
-  const [importMethod, setImportMethod] = useState<ImportMethod>('seed');
-  const [seed, setSeed] = useState('');
-  const [mnemonic, setMnemonic] = useState('');
+  const [importMethod, setImportMethod] = useState<ImportMethod>('mnemonic');
+  const [mnemonicWords, setMnemonicWords] = useState<string[]>(Array(TOTAL_MNEMONIC_WORDS).fill(''));
   const [privateKey, setPrivateKey] = useState('');
   const router = useRouter();
+
+  const handleWordChange = (index: number, value: string) => {
+    setMnemonicWords((prev) => {
+      const updated = [...prev];
+      updated[index] = value;
+      return updated;
+    });
+  };
 
   const handleImport = async () => {
     try {
       let result;
 
-      if (importMethod === 'seed') {
-        if (!seed.trim()) {
-          Alert.alert('Error', 'Please enter your seed');
+      if (importMethod === 'mnemonic') {
+        const selectedWords = mnemonicWords.map((word) => word.trim());
+        const hasEmpty = selectedWords.some((word) => word.length === 0);
+        if (hasEmpty) {
+          Alert.alert('Error', 'Please fill in every mnemonic word.');
           return;
         }
-        result = await dispatch(importWalletFromSeed(seed.trim()));
-      } else if (importMethod === 'mnemonic') {
+        const mnemonic = selectedWords.join(' ');
         if (!mnemonic.trim()) {
           Alert.alert('Error', 'Please enter your mnemonic phrase');
           return;
@@ -59,7 +68,7 @@ export default function ImportWalletScreen() {
         return;
       }
 
-      if (importWalletFromSeed.fulfilled.match(result) || importWalletFromMnemonic.fulfilled.match(result)) {
+      if (importWalletFromMnemonic.fulfilled.match(result)) {
         Alert.alert(
           'Success',
           'Wallet imported successfully!',
@@ -70,7 +79,7 @@ export default function ImportWalletScreen() {
             },
           ]
         );
-      } else if (importWalletFromSeed.rejected.match(result) || importWalletFromMnemonic.rejected.match(result)) {
+      } else if (importWalletFromMnemonic.rejected.match(result)) {
         Alert.alert(
           'Error',
           (result.payload as string) || 'Failed to import wallet. Please check your credentials and try again.',
@@ -106,20 +115,6 @@ export default function ImportWalletScreen() {
         <View className="flex-row mb-5 gap-2">
           <TouchableOpacity
             className={`flex-1 py-3 px-4 rounded-xl items-center ${
-              importMethod === 'seed' ? 'bg-blue-500' : 'bg-white border border-blue-500'
-            }`}
-            onPress={() => setImportMethod('seed')}
-          >
-            <Text
-              className={`text-base font-semibold ${
-                importMethod === 'seed' ? 'text-white' : 'text-blue-500'
-              }`}
-            >
-              Seed
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            className={`flex-1 py-3 px-4 rounded-xl items-center ${
               importMethod === 'mnemonic' ? 'bg-blue-500' : 'bg-white border border-blue-500'
             }`}
             onPress={() => setImportMethod('mnemonic')}
@@ -148,47 +143,32 @@ export default function ImportWalletScreen() {
           </TouchableOpacity>
         </View>
 
-        {importMethod === 'seed' ? (
+        {importMethod === 'mnemonic' ? (
           <View className="mb-5">
-            <Text className="text-base font-semibold text-black mb-2">
-              Wallet Seed
-            </Text>
-            <TextInput
-              className="bg-white border border-gray-300 rounded-xl p-3 text-base min-h-[100px] text-gray-900"
-              value={seed}
-              onChangeText={setSeed}
-              placeholder="Enter your wallet seed"
-              placeholderTextColor="#9CA3AF"
-              multiline
-              numberOfLines={4}
-              autoCapitalize="none"
-              secureTextEntry
-              textAlignVertical="top"
-            />
-            <Text className="text-xs text-gray-500 mt-2">
-              Enter your KeetaNet wallet seed
-            </Text>
-          </View>
-        ) : importMethod === 'mnemonic' ? (
-          <View className="mb-5">
-            <Text className="text-base font-semibold text-black mb-2">
+            <Text className="text-base font-semibold text-black mb-3">
               Mnemonic Phrase
             </Text>
-            <TextInput
-              className="bg-white border border-gray-300 rounded-xl p-3 text-base min-h-[100px] text-gray-900"
-              value={mnemonic}
-              onChangeText={setMnemonic}
-              placeholder="Enter your mnemonic phrase"
-              placeholderTextColor="#9CA3AF"
-              multiline
-              numberOfLines={4}
-              autoCapitalize="none"
-              secureTextEntry
-              textAlignVertical="top"
-            />
-            <Text className="text-xs text-gray-500 mt-2">
-              Enter your mnemonic phrase (treated as seed)
+            <Text className="text-xs text-gray-500 mb-3">
+              Enter each word in order exactly as provided in your 24-word recovery phrase.
             </Text>
+            <View className="flex-row flex-wrap justify-between">
+              {mnemonicWords.map((word, index) => (
+                <View key={index} className="w-[48%] mb-3">
+                  <Text className="text-xs text-gray-500 mb-1">
+                    {index + 1}.
+                  </Text>
+                  <TextInput
+                    className="bg-white border border-gray-300 rounded-lg p-3 text-base text-gray-900"
+                    value={word}
+                    onChangeText={(text) => handleWordChange(index, text)}
+                    placeholder={`Word ${index + 1}`}
+                    placeholderTextColor="#9CA3AF"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </View>
+              ))}
+            </View>
           </View>
         ) : (
           <View className="mb-5">

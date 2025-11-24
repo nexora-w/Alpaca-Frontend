@@ -1,15 +1,16 @@
-import { useEffect } from 'react';
-import { ScrollView, RefreshControl, TouchableOpacity, View, Text, Clipboard, Alert } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ScrollView, RefreshControl, TouchableOpacity, View, Text, Clipboard, Alert, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { loadWalletFromStorage, fetchAccountBalance, setRefreshing } from '@/store/slices/walletSlice';
+import { loadWalletFromStorage, fetchAccountBalance, setRefreshing, deleteWalletData } from '@/store/slices/walletSlice';
 
 export default function WalletScreen() {
   const dispatch = useAppDispatch();
   const router = useRouter();
   const { walletData, balance, tokens, loading, refreshing } = useAppSelector((state) => state.wallet);
   const address = walletData?.address || null;
+  const [settingsVisible, setSettingsVisible] = useState(false);
 
   useEffect(() => {
     loadWalletData();
@@ -56,6 +57,31 @@ export default function WalletScreen() {
     return num.toFixed(4);
   };
 
+  const handleDeleteWallet = () => {
+    Alert.alert(
+      'Delete Wallet',
+      'This will permanently remove your wallet from this device. Make sure you have a backup before continuing.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setSettingsVisible(false);
+              await dispatch(deleteWalletData()).unwrap();
+              Alert.alert('Wallet Deleted', 'Your wallet has been removed from this device.');
+              router.replace('/');
+            } catch (error: any) {
+              const message = typeof error === 'string' ? error : error?.message;
+              Alert.alert('Error', message || 'Failed to delete wallet');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <View className="flex-1 bg-blue-50">
       <ScrollView
@@ -69,9 +95,17 @@ export default function WalletScreen() {
       >
         {/* Header */}
         <View className="mb-6">
-          <Text className="text-2xl font-bold text-black mb-2">
-            Wallet
-          </Text>
+          <View className="flex-row items-center justify-between mb-2">
+            <Text className="text-2xl font-bold text-black">
+              Wallet
+            </Text>
+            <TouchableOpacity
+              className="w-10 h-10 rounded-full bg-white border border-gray-200 items-center justify-center"
+              onPress={() => setSettingsVisible(true)}
+            >
+              <Ionicons name="settings-outline" size={20} color="#1f2937" />
+            </TouchableOpacity>
+          </View>
           {address ? (
             <TouchableOpacity
               onPress={() => copyToClipboard(address, 'Address')}
@@ -173,6 +207,48 @@ export default function WalletScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      <Modal
+        visible={settingsVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSettingsVisible(false)}
+      >
+        <View className="flex-1 justify-end">
+          <TouchableOpacity
+            className="flex-1 bg-black/40"
+            activeOpacity={1}
+            onPress={() => setSettingsVisible(false)}
+          />
+          <View className="bg-white rounded-t-3xl p-6">
+            <View className="flex-row justify-between items-center mb-4">
+              <Text className="text-xl font-semibold text-black">
+                Settings
+              </Text>
+              <TouchableOpacity onPress={() => setSettingsVisible(false)}>
+                <Ionicons name="close" size={24} color="#111827" />
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              className="bg-red-50 border border-red-200 rounded-xl p-4 flex-row items-center"
+              onPress={handleDeleteWallet}
+              disabled={loading}
+            >
+              <View className="w-10 h-10 rounded-full bg-red-100 items-center justify-center mr-3">
+                <Ionicons name="trash-outline" size={20} color="#dc2626" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-red-600 font-semibold text-base">
+                  Delete Wallet
+                </Text>
+                <Text className="text-gray-500 text-xs">
+                  Remove wallet data from this device
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

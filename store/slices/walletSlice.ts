@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { walletApi } from '@/services/api';
-import { getWalletAddress, saveWallet, getWallet } from '@/services/walletStorage';
+import { saveWallet, getWallet, deleteWallet } from '@/services/walletStorage';
 
 export interface WalletData {
   address: string;
@@ -128,6 +128,18 @@ export const fetchAccountBalance = createAsyncThunk(
   }
 );
 
+export const deleteWalletData = createAsyncThunk(
+  'wallet/delete',
+  async (_, { rejectWithValue }) => {
+    try {
+      await deleteWallet();
+      return true;
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to delete wallet');
+    }
+  }
+);
+
 const walletSlice = createSlice({
   name: 'wallet',
   initialState,
@@ -235,6 +247,22 @@ const walletSlice = createSlice({
         state.loading = false;
         state.refreshing = false;
         // Don't set error, just keep existing balance
+      });
+
+    builder
+      .addCase(deleteWalletData.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(deleteWalletData.fulfilled, (state) => {
+        state.loading = false;
+        state.walletData = null;
+        state.balance = 0;
+        state.tokens = [];
+      })
+      .addCase(deleteWalletData.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
       });
   },
 });
