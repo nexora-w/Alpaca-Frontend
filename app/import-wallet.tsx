@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ScrollView, Alert, ActivityIndicator, TextInput, TouchableOpacity, View, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { importWalletFromMnemonic } from '@/store/slices/walletSlice';
+import { importWalletFromMnemonic, loadWalletFromStorage } from '@/store/slices/walletSlice';
 import { walletApi } from '@/services/api';
 import { saveWallet } from '@/services/walletStorage';
 
@@ -65,20 +65,13 @@ export default function ImportWalletScreen() {
             ]
           );
         }
+        await dispatch(loadWalletFromStorage());
+        router.replace('/wallet');
         return;
       }
 
       if (importWalletFromMnemonic.fulfilled.match(result)) {
-        Alert.alert(
-          'Success',
-          'Wallet imported successfully!',
-          [
-            {
-              text: 'OK',
-              onPress: () => router.replace('/wallet'),
-            },
-          ]
-        );
+        router.replace('/wallet');
       } else if (importWalletFromMnemonic.rejected.match(result)) {
         Alert.alert(
           'Error',
@@ -97,20 +90,14 @@ export default function ImportWalletScreen() {
   };
 
   return (
-    <View className="flex-1 bg-blue-50">
+    <View className="flex-1 bg-blue-50 min-h-screen">
       <ScrollView 
         contentContainerStyle={{ 
           padding: 20, 
           flexGrow: 1, 
-          justifyContent: 'center' 
+          justifyContent: 'flex-start' 
         }}
       >
-        <Text className="text-xl font-bold text-black text-center mb-2">
-          Import Wallet
-        </Text>
-        <Text className="text-base text-gray-600 text-center mb-6 leading-6">
-          Import an existing KeetaNet wallet using your seed, mnemonic phrase, or private key.
-        </Text>
 
         <View className="flex-row mb-5 gap-2">
           <TouchableOpacity
@@ -153,10 +140,7 @@ export default function ImportWalletScreen() {
             </Text>
             <View className="flex-row flex-wrap justify-between">
               {mnemonicWords.map((word, index) => (
-                <View key={index} className="w-[48%] mb-3">
-                  <Text className="text-xs text-gray-500 mb-1">
-                    {index + 1}.
-                  </Text>
+                <View key={index} className="w-[32%] rounded-lg p-2 mb-1 mx-auto">
                   <TextInput
                     className="bg-white border border-gray-300 rounded-lg p-3 text-base text-gray-900"
                     value={word}

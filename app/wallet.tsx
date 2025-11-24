@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ScrollView, RefreshControl, TouchableOpacity, View, Text, Clipboard, Alert, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import QRCode from 'react-native-qrcode-svg';
 import { useRouter } from 'expo-router';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { loadWalletFromStorage, fetchAccountBalance, setRefreshing, deleteWalletData } from '@/store/slices/walletSlice';
@@ -11,6 +12,7 @@ export default function WalletScreen() {
   const { walletData, balance, tokens, loading, refreshing } = useAppSelector((state) => state.wallet);
   const address = walletData?.address || null;
   const [settingsVisible, setSettingsVisible] = useState(false);
+  const [addressModalVisible, setAddressModalVisible] = useState(false);
 
   useEffect(() => {
     loadWalletData();
@@ -82,6 +84,14 @@ export default function WalletScreen() {
     );
   };
 
+  const handleShowAddress = () => {
+    if (!address) {
+      Alert.alert('No Wallet', 'Please create or import a wallet first.');
+      return;
+    }
+    setAddressModalVisible(true);
+  };
+
   return (
     <View className="flex-1 bg-blue-50">
       <ScrollView
@@ -95,10 +105,15 @@ export default function WalletScreen() {
       >
         {/* Header */}
         <View className="mb-6">
-          <View className="flex-row items-center justify-between mb-2">
-            <Text className="text-2xl font-bold text-black">
-              Wallet
-            </Text>
+          <View className="flex-row items-center justify-between mb-4">
+            <View>
+              <Text className="text-2xl font-bold text-black">
+                Wallet
+              </Text>
+              <Text className="text-sm text-gray-500 mt-1">
+                Manage your KeetaNet funds securely
+              </Text>
+            </View>
             <TouchableOpacity
               className="w-10 h-10 rounded-full bg-white border border-gray-200 items-center justify-center"
               onPress={() => setSettingsVisible(true)}
@@ -106,17 +121,6 @@ export default function WalletScreen() {
               <Ionicons name="settings-outline" size={20} color="#1f2937" />
             </TouchableOpacity>
           </View>
-          {address ? (
-            <TouchableOpacity
-              onPress={() => copyToClipboard(address, 'Address')}
-              className="flex-row items-center bg-white p-3 rounded-lg border border-gray-200"
-            >
-              <Text className="text-xs text-gray-600 font-mono flex-1">
-                {formatAddress(address)}
-              </Text>
-              <Ionicons name="copy-outline" size={16} color="#666" />
-            </TouchableOpacity>
-          ) : null}
         </View>
 
         {/* Balance Card */}
@@ -195,6 +199,9 @@ export default function WalletScreen() {
         <View className="flex-row justify-between mb-6">
           <TouchableOpacity
             className="flex-1 bg-white rounded-lg p-4 items-center mr-2 border border-gray-200"
+            onPress={handleShowAddress}
+            disabled={!address}
+            style={{ opacity: address ? 1 : 0.5 }}
           >
             <Ionicons name="arrow-down-outline" size={24} color="#2196F3" />
             <Text className="text-blue-500 font-semibold mt-2">Receive</Text>
@@ -207,6 +214,54 @@ export default function WalletScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      <Modal
+        visible={addressModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAddressModalVisible(false)}
+      >
+        <View className="flex-1 bg-black/60 items-center justify-center px-6">
+          <View className="w-full bg-white rounded-3xl p-6">
+            <View className="flex-row justify-between items-center mb-4">
+              <Text className="text-lg font-semibold text-black">
+                Receive Tokens
+              </Text>
+              <TouchableOpacity onPress={() => setAddressModalVisible(false)}>
+                <Ionicons name="close" size={22} color="#111827" />
+              </TouchableOpacity>
+            </View>
+            {address ? (
+              <>
+                <View className="bg-gray-50 rounded-2xl p-4 items-center mb-4">
+                  <QRCode value={address} size={180} color="#111827" backgroundColor="#fff" />
+                </View>
+                <View className="bg-gray-100 rounded-2xl p-3 mb-4">
+                  <Text className="text-xs text-gray-500 mb-1">
+                    Wallet Address
+                  </Text>
+                  <Text className="text-sm text-gray-900 font-mono">
+                    {address}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  className="flex-row items-center justify-center bg-blue-500 rounded-xl py-3"
+                  onPress={() => copyToClipboard(address, 'Address')}
+                >
+                  <Ionicons name="copy-outline" size={18} color="#fff" />
+                  <Text className="text-white font-semibold ml-2">
+                    Copy Address
+                  </Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <Text className="text-center text-gray-500">
+                No wallet address available. Please create or import a wallet.
+              </Text>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={settingsVisible}
