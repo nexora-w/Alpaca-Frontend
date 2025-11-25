@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
-import { ScrollView, RefreshControl, TouchableOpacity, View, Text, Clipboard, Alert, Modal } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import QRCode from 'react-native-qrcode-svg';
-import { useRouter } from 'expo-router';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { loadWalletFromStorage, fetchAccountBalance, setRefreshing, deleteWalletData } from '@/store/slices/walletSlice';
+import { deleteWalletData, fetchAccountBalance, loadWalletFromStorage, setRefreshing } from '@/store/slices/walletSlice';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Alert, Clipboard, Modal, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
 
 export default function WalletScreen() {
   const dispatch = useAppDispatch();
@@ -90,6 +90,15 @@ export default function WalletScreen() {
       return;
     }
     setAddressModalVisible(true);
+  };
+
+  const handleBackupWallet = () => {
+    if (!walletData?.mnemonic && !walletData?.seed) {
+      Alert.alert('Unavailable', 'No seed phrase found for this wallet.');
+      return;
+    }
+    setSettingsVisible(false);
+    router.push('/backup-wallet');
   };
 
   return (
@@ -284,6 +293,23 @@ export default function WalletScreen() {
                 <Ionicons name="close" size={24} color="#111827" />
               </TouchableOpacity>
             </View>
+            <TouchableOpacity
+              className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex-row items-center mb-4"
+              onPress={handleBackupWallet}
+              disabled={loading}
+            >
+              <View className="w-10 h-10 rounded-full bg-blue-100 items-center justify-center mr-3">
+                <Ionicons name="shield-checkmark-outline" size={20} color="#2563eb" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-blue-600 font-semibold text-base">
+                  Backup Wallet
+                </Text>
+                <Text className="text-gray-500 text-xs">
+                  View and secure your seed phrase
+                </Text>
+              </View>
+            </TouchableOpacity>
             <TouchableOpacity
               className="bg-red-50 border border-red-200 rounded-xl p-4 flex-row items-center"
               onPress={handleDeleteWallet}

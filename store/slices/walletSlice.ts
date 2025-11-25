@@ -1,6 +1,6 @@
-import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { walletApi } from '@/services/api';
-import { saveWallet, getWallet, deleteWallet } from '@/services/walletStorage';
+import { deleteWallet, getWallet, saveWallet } from '@/services/walletStorage';
+import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 export interface WalletData {
   address: string;
@@ -48,12 +48,14 @@ export const createWallet = createAsyncThunk(
     try {
       const response = await walletApi.createWallet();
       if (response.success && response.data) {
+        console.log('response.data', response.data);
         // Save to secure storage
         await saveWallet({
           address: response.data.address,
           mnemonic: response.data.mnemonic,
           seed: response.data.seed,
           publicKey: response.data.publicKey,
+          privateKey: response.data.privateKey,
         });
         return response.data;
       }
@@ -186,6 +188,7 @@ const walletSlice = createSlice({
           mnemonic: action.payload.mnemonic,
           seed: action.payload.seed,
           publicKey: action.payload.publicKey,
+          privateKey: action.payload.privateKey,
         };
       })
       .addCase(createWallet.rejected, (state, action) => {

@@ -6,8 +6,8 @@ import axios from 'axios';
 // For Android emulator, use: 'http://10.0.2.2:4000/api/v1'
 // For iOS simulator, use: 'http://localhost:4000/api/v1'
 const API_BASE_URL = __DEV__ 
-  ? 'http://72.60.115.179:30303/api/v1' 
-  : 'http://72.60.115.179:30303/api/v1';
+  ? 'https://0edaf3ead87c.ngrok-free.app/api/v1' 
+  : 'https://0edaf3ead87c.ngrok-free.app/api/v1';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -23,6 +23,7 @@ export interface CreateWalletResponse {
     publicKey: string;
     mnemonic: string; // BIP39 mnemonic phrase (12 words)
     seed: string; // Hex seed derived from mnemonic (for backward compatibility)
+    privateKey?: string; // Raw private key (optional)
   };
   message: string;
 }

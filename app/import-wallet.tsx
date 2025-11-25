@@ -1,10 +1,12 @@
-import { useState } from 'react';
-import { ScrollView, Alert, ActivityIndicator, TextInput, TouchableOpacity, View, Text } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { importWalletFromMnemonic, loadWalletFromStorage } from '@/store/slices/walletSlice';
 import { walletApi } from '@/services/api';
 import { saveWallet } from '@/services/walletStorage';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { importWalletFromMnemonic, loadWalletFromStorage } from '@/store/slices/walletSlice';
+import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
+import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 type ImportMethod = 'mnemonic' | 'privateKey';
 const TOTAL_MNEMONIC_WORDS = 24;
@@ -15,6 +17,7 @@ export default function ImportWalletScreen() {
   const [importMethod, setImportMethod] = useState<ImportMethod>('mnemonic');
   const [mnemonicWords, setMnemonicWords] = useState<string[]>(Array(TOTAL_MNEMONIC_WORDS).fill(''));
   const [privateKey, setPrivateKey] = useState('');
+  const [privateKeyVisible, setPrivateKeyVisible] = useState(false);
   const router = useRouter();
 
   const handleWordChange = (index: number, value: string) => {
@@ -24,6 +27,66 @@ export default function ImportWalletScreen() {
       return updated;
     });
   };
+
+  const handlePaste = useCallback(async () => {
+    try {
+      const clipboardText = await Clipboard.getStringAsync();
+      if (!clipboardText || !clipboardText.trim()) {
+        Alert.alert('Error', 'No text found in clipboard');
+        return;
+      }
+
+      // Split by whitespace (spaces, tabs, newlines)
+      const words = clipboardText.trim().split(/\s+/).filter(word => word.length > 0);
+      
+      if (words.length === TOTAL_MNEMONIC_WORDS) {
+        // Fill all 24 fields with the words
+        setMnemonicWords(words);
+        Alert.alert('Success', 'Mnemonic phrase pasted successfully!');
+      } else if (words.length > TOTAL_MNEMONIC_WORDS) {
+        Alert.alert('Error', `Found ${words.length} words, but expected ${TOTAL_MNEMONIC_WORDS} words.`);
+      } else {
+        Alert.alert('Error', `Found only ${words.length} words, but expected ${TOTAL_MNEMONIC_WORDS} words.`);
+      }
+    } catch (error) {
+      console.error('Error reading clipboard:', error);
+      Alert.alert('Error', 'Failed to read from clipboard');
+    }
+  }, []);
+
+  const handleClear = useCallback(() => {
+    if (importMethod === 'mnemonic') {
+      setMnemonicWords(Array(TOTAL_MNEMONIC_WORDS).fill(''));
+    } else {
+      setPrivateKey('');
+    }
+  }, [importMethod]);
+
+  // Add keyboard shortcut support (Ctrl+V / Cmd+V) for web
+  useEffect(() => {
+    // Only add keyboard listener on web platform
+    if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Check if Ctrl+V (Windows/Linux) or Cmd+V (Mac) is pressed
+      if ((event.ctrlKey || event.metaKey) && event.key === 'v') {
+        // Only handle paste if mnemonic method is selected
+        if (importMethod === 'mnemonic') {
+          event.preventDefault();
+          handlePaste();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+        window.removeEventListener('keydown', handleKeyDown);
+      }
+    };
+  }, [importMethod, handlePaste]); // Re-run when importMethod or handlePaste changes
 
   const handleImport = async () => {
     try {
@@ -53,6 +116,7 @@ export default function ImportWalletScreen() {
           await saveWallet({
             address: response.data.address,
             publicKey: response.data.publicKey,
+            privateKey: privateKey.trim(),
           });
           Alert.alert(
             'Success',
@@ -132,9 +196,25 @@ export default function ImportWalletScreen() {
 
         {importMethod === 'mnemonic' ? (
           <View className="mb-5">
-            <Text className="text-base font-semibold text-black mb-3">
-              Mnemonic Phrase
-            </Text>
+            <View className="flex-row justify-between items-center mb-3">
+              <Text className="text-base font-semibold text-black">
+                Mnemonic Phrase
+              </Text>
+              <View className="flex-row gap-2">
+                <TouchableOpacity
+                  className="bg-gray-500 py-2 px-4 rounded-lg"
+                  onPress={handleClear}
+                >
+                  <Text className="text-white text-sm font-semibold">Clear</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  className="bg-blue-500 py-2 px-4 rounded-lg"
+                  onPress={handlePaste}
+                >
+                  <Text className="text-white text-sm font-semibold">Paste</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
             <Text className="text-xs text-gray-500 mb-3">
               Enter each word in order exactly as provided in your 24-word recovery phrase.
             </Text>
@@ -144,7 +224,18 @@ export default function ImportWalletScreen() {
                   <TextInput
                     className="bg-white border border-gray-300 rounded-lg p-3 text-base text-gray-900"
                     value={word}
-                    onChangeText={(text) => handleWordChange(index, text)}
+                    onChangeText={(text) => {
+                      // Check if the pasted text contains multiple words (24 words)
+                      const words = text.trim().split(/\s+/).filter(w => w.length > 0);
+                      if (words.length === TOTAL_MNEMONIC_WORDS) {
+                        // Auto-fill all fields
+                        setMnemonicWords(words);
+                        Alert.alert('Success', 'Mnemonic phrase pasted successfully!');
+                      } else {
+                        // Normal single word input
+                        handleWordChange(index, text);
+                      }
+                    }}
                     placeholder={`Word ${index + 1}`}
                     placeholderTextColor="#9CA3AF"
                     autoCapitalize="none"
@@ -156,18 +247,37 @@ export default function ImportWalletScreen() {
           </View>
         ) : (
           <View className="mb-5">
-            <Text className="text-base font-semibold text-black mb-2">
-              Private Key
-            </Text>
-            <TextInput
-              className="bg-white border border-gray-300 rounded-xl p-3 text-base min-h-[50px] text-gray-900"
-              value={privateKey}
-              onChangeText={setPrivateKey}
-              placeholder="Enter your private key"
-              placeholderTextColor="#9CA3AF"
-              autoCapitalize="none"
-              secureTextEntry
-            />
+            <View className="flex-row justify-between items-center mb-2">
+              <Text className="text-base font-semibold text-black">
+                Private Key
+              </Text>
+              <TouchableOpacity
+                className="bg-gray-500 py-2 px-4 rounded-lg"
+                onPress={handleClear}
+              >
+                <Text className="text-white text-sm font-semibold">Clear</Text>
+              </TouchableOpacity>
+            </View>
+            <View className="relative">
+              <TextInput
+                className="bg-white border border-gray-300 rounded-xl py-3 pl-4 pr-12 text-base min-h-[50px] text-gray-900 font-mono"
+                value={privateKey}
+                onChangeText={setPrivateKey}
+                placeholder="Enter your private key"
+                placeholderTextColor="#9CA3AF"
+                autoCapitalize="none"
+                autoCorrect={false}
+                secureTextEntry={!privateKeyVisible}
+              />
+              <TouchableOpacity
+                onPress={() => setPrivateKeyVisible((prev) => !prev)}
+                className="absolute inset-y-0 right-3 flex-row items-center justify-center"
+                accessibilityRole="button"
+                accessibilityLabel={privateKeyVisible ? 'Hide private key' : 'Show private key'}
+              >
+                <Ionicons name={privateKeyVisible ? 'eye-off' : 'eye'} size={20} color="#4b5563" />
+              </TouchableOpacity>
+            </View>
             <Text className="text-xs text-gray-500 mt-2">
               Enter your private key (treated as seed)
             </Text>

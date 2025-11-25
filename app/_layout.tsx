@@ -16,7 +16,8 @@ export default function RootLayout() {
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
         <Stack.Screen name="index" options={{ headerShown: false }} />
-          <Stack.Screen name="wallet" options={{ headerShown: false }} />
+        <Stack.Screen name="wallet" options={{ headerShown: false }} />
+        <Stack.Screen name="backup-wallet" options={{ presentation: 'modal', headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         <Stack.Screen name="create-wallet" options={{ presentation: 'modal', title: 'Create Wallet' }} />
         <Stack.Screen name="import-wallet" options={{ presentation: 'modal', title: 'Import Wallet' }} />

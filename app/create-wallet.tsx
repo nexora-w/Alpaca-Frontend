@@ -1,9 +1,10 @@
-import { useState } from 'react';
-import { ScrollView, Alert, ActivityIndicator, TouchableOpacity, View, Text, Clipboard } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { createWallet } from '@/store/slices/walletSlice';
+import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
 export default function CreateWalletScreen() {
   const dispatch = useAppDispatch();
@@ -133,9 +134,9 @@ export default function CreateWalletScreen() {
     }
   };
 
-  const copyToClipboard = (text: string, label: string) => {
+  const copyToClipboard = async (text: string, label: string) => {
     try {
-      Clipboard.setString(text);
+      await Clipboard.setStringAsync(text);
       Alert.alert('Copied', `${label} copied to clipboard`);
     } catch (error) {
       Alert.alert('Error', 'Failed to copy to clipboard');
@@ -287,36 +288,51 @@ export default function CreateWalletScreen() {
             </Text>
 
             {walletData?.mnemonic && (
-              <TouchableOpacity
-                onPress={() => setSeedVisible(!seedVisible)}
-                activeOpacity={0.7}
-                className="mb-6 relative"
-              >
-                <View className="flex-row flex-wrap">
-                  {walletData.mnemonic.split(' ').map((word: string, index: number) => (
-                    <View
-                      key={index}
-                      className="w-[32%] bg-gray-200 border border-gray-300 rounded-lg p-2 mb-1 mx-auto"
-                    >
-                      <Text className="text-xs text-gray-500 mb-1 text-left">
-                        {index + 1}. {seedVisible ? word : '••••••'}
+              <>
+                <View className="flex-row justify-end mb-2">
+                  <TouchableOpacity
+                    className="flex-row items-center bg-blue-500 py-2 px-4 rounded-lg"
+                    onPress={() => {
+                      if (walletData?.mnemonic) {
+                        copyToClipboard(walletData.mnemonic, 'Seed phrase');
+                      }
+                    }}
+                  >
+                    <Ionicons name="copy-outline" size={18} color="#fff" />
+                    <Text className="text-white text-sm font-semibold ml-2">Copy</Text>
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setSeedVisible(!seedVisible)}
+                  activeOpacity={0.7}
+                  className="mb-6 relative"
+                >
+                  <View className="flex-row flex-wrap">
+                    {walletData.mnemonic.split(' ').map((word: string, index: number) => (
+                      <View
+                        key={index}
+                        className="w-[32%] bg-gray-200 border border-gray-300 rounded-lg p-2 mb-1 mx-auto"
+                      >
+                        <Text className="text-xs text-gray-500 mb-1 text-left">
+                          {index + 1}. {seedVisible ? word : '••••••'}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                  {!seedVisible &&
+                    <View className="flex justify-center items-center absolute bottom-0 left-0 right-0 top-0 bg-black/50 z-10 backdrop-blur-sm">
+                      <Ionicons
+                        name={seedVisible ? 'eye-off' : 'eye'}
+                        size={24}
+                        color="#000"
+                      />
+                      <Text className="text-sm text-white text-center mt-2 px-4">
+                        Click on the seed phrase to show it in full or hide it. Make sure no one is looking at your screen.
                       </Text>
                     </View>
-                  ))}
-                </View>
-                {!seedVisible &&
-                  <View className="flex justify-center items-center absolute bottom-0 left-0 right-0 top-0 bg-black/50 z-10 backdrop-blur-sm">
-                    <Ionicons
-                      name={seedVisible ? 'eye-off' : 'eye'}
-                      size={24}
-                      color="#000"
-                    />
-                    <Text className="text-sm text-white text-center mt-2 px-4">
-                      Click on the seed phrase to show it in full or hide it. Make sure no one is looking at your screen.
-                    </Text>
-                  </View>
-                }
-              </TouchableOpacity>
+                  }
+                </TouchableOpacity>
+              </>
             )}
 
 

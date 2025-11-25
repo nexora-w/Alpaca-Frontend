@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { TouchableOpacity, View, Text, Linking, ImageBackground } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { loadWalletFromStorage } from '@/store/slices/walletSlice';
 
@@ -13,11 +14,13 @@ export default function HomeScreen() {
     dispatch(loadWalletFromStorage());
   }, [dispatch]);
 
-  useEffect(() => {
-    if (walletData?.address) {
-      router.replace('/wallet');
-    }
-  }, [walletData, router]);
+  useFocusEffect(
+    useCallback(() => {
+      if (walletData?.address) {
+        router.replace('/wallet');
+      }
+    }, [walletData, router])
+  );
 
   const handleTermsPress = () => {
     // Handle Terms & Conditions link
