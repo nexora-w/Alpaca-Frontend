@@ -10,7 +10,7 @@ type RecoveryTab = 'phrase' | 'privateKey';
 export default function BackupWalletScreen() {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const { walletData, loading } = useAppSelector((state) => state.wallet);
+  const { walletData } = useAppSelector((state) => state.wallet);
   const [phraseVisible, setPhraseVisible] = useState(false);
   const [privateKeyVisible, setPrivateKeyVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<RecoveryTab>('phrase');
@@ -71,7 +71,7 @@ export default function BackupWalletScreen() {
     try {
       Clipboard.setString(value);
       Alert.alert('Copied', `${label} copied to clipboard`);
-    } catch (error) {
+    } catch {
       Alert.alert('Error', `Failed to copy ${label.toLowerCase()}`);
     }
   };

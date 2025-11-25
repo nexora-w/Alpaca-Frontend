@@ -8,15 +8,17 @@ import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } fr
 
 export default function CreateWalletScreen() {
   const dispatch = useAppDispatch();
-  const { loading, walletData, error } = useAppSelector((state) => state.wallet);
+  const { loading, walletData } = useAppSelector((state) => state.wallet);
   const [seedVisible, setSeedVisible] = useState(false);
   const [showWarning, setShowWarning] = useState(true);
   const [showConfirmation, setShowConfirmation] = useState(false);
-  const [confirmationPositions, setConfirmationPositions] = useState<Array<{
-    position: number;
-    correctWord: string;
-    options: string[];
-  }>>([]);
+  const [confirmationPositions, setConfirmationPositions] = useState<
+    {
+      position: number;
+      correctWord: string;
+      options: string[];
+    }[]
+  >([]);
   const [selectedWords, setSelectedWords] = useState<{ [position: number]: string }>({});
   const router = useRouter();
 
@@ -120,9 +122,8 @@ export default function CreateWalletScreen() {
     console.log('Confirmation positions:', confirmationPositions);
     
     if (allCorrect) {
-      // Navigate to wallet page
-      console.log('Validation successful, navigating to wallet...');
-      router.replace('/wallet');
+      // Navigate to password setup screen before showing wallet
+      router.replace('/set-password');
     } else {
       Alert.alert(
         'Incorrect',
@@ -138,7 +139,7 @@ export default function CreateWalletScreen() {
     try {
       await Clipboard.setStringAsync(text);
       Alert.alert('Copied', `${label} copied to clipboard`);
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'Failed to copy to clipboard');
     }
   };
@@ -158,7 +159,7 @@ export default function CreateWalletScreen() {
               Create Wallet
             </Text>
             <Text className="text-base text-gray-600 text-center mb-6 leading-6">
-              Create a new KeetaNet wallet. You'll receive a recovery phrase that you must save securely.
+              Create a new KeetaNet wallet. You&apos;ll receive a recovery phrase that you must save securely.
             </Text>
             <TouchableOpacity
               className="bg-blue-500 py-4 px-8 rounded-xl w-full items-center mt-5 shadow-lg"
@@ -189,7 +190,7 @@ export default function CreateWalletScreen() {
               <View className="flex-row items-start mb-4">
                 <Text className="text-black text-lg mr-3">✓</Text>
                 <Text className="text-black flex-1">
-                  Know it's the only way to recover your assets
+                  Know it&apos;s the only way to recover your assets
                 </Text>
               </View>
               <View className="flex-row items-start mb-4">
@@ -284,7 +285,7 @@ export default function CreateWalletScreen() {
             </Text>
 
             <Text className="text-xs text-gray-600 mb-6">
-              Write down the words in the sequence below and keep them safe. Don't share them with anyone, or you may permanently lose your assets.
+              Write down the words in the sequence below and keep them safe. Don&apos;t share them with anyone, or you may permanently lose your assets.
             </Text>
 
             {walletData?.mnemonic && (
@@ -340,7 +341,7 @@ export default function CreateWalletScreen() {
               className="bg-blue-500 py-4 px-8 rounded-xl w-full items-center"
               onPress={handleContinue}
             >
-              <Text className="text-white text-base font-semibold">I've noted it down</Text>
+              <Text className="text-white text-base font-semibold">I&apos;ve noted it down</Text>
             </TouchableOpacity>
           </View>
         )}

@@ -6,6 +6,9 @@ const MNEMONIC_KEY = 'wallet_mnemonic';
 const PRIVATE_KEY_KEY = 'wallet_private_key';
 const ADDRESS_KEY = 'wallet_address';
 const PUBLIC_KEY_KEY = 'wallet_public_key';
+const PASSWORD_HASH_KEY = 'wallet_password_hash';
+const AUTO_LOCK_MINUTES_KEY = 'wallet_auto_lock_minutes';
+const LAST_UNLOCKED_AT_KEY = 'wallet_last_unlocked_at';
 
 export interface WalletData {
   address: string;
@@ -151,9 +154,88 @@ export const deleteWallet = async (): Promise<void> => {
     await SecureStore.deleteItemAsync(PUBLIC_KEY_KEY);
     await SecureStore.deleteItemAsync(MNEMONIC_KEY);
     await SecureStore.deleteItemAsync(PRIVATE_KEY_KEY);
+    await clearSecurityData();
   } catch (error) {
     console.error('Error deleting wallet:', error);
     throw new Error('Failed to delete wallet data');
+  }
+};
+
+/**
+ * Save password hash (already hashed before calling)
+ */
+export const setWalletPasswordHash = async (hash: string): Promise<void> => {
+  try {
+    await SecureStore.setItemAsync(PASSWORD_HASH_KEY, hash);
+  } catch (error) {
+    console.error('Error saving wallet password:', error);
+    throw new Error('Failed to save wallet password');
+  }
+};
+
+export const getWalletPasswordHash = async (): Promise<string | null> => {
+  try {
+    return await SecureStore.getItemAsync(PASSWORD_HASH_KEY);
+  } catch (error) {
+    console.error('Error loading wallet password:', error);
+    return null;
+  }
+};
+
+export const clearWalletPassword = async (): Promise<void> => {
+  try {
+    await SecureStore.deleteItemAsync(PASSWORD_HASH_KEY);
+  } catch (error) {
+    console.error('Error clearing wallet password:', error);
+  }
+};
+
+export const setAutoLockMinutes = async (minutes: number): Promise<void> => {
+  try {
+    await SecureStore.setItemAsync(AUTO_LOCK_MINUTES_KEY, minutes.toString());
+  } catch (error) {
+    console.error('Error saving auto-lock minutes:', error);
+    throw new Error('Failed to save auto-lock setting');
+  }
+};
+
+export const getAutoLockMinutes = async (): Promise<number | null> => {
+  try {
+    const value = await SecureStore.getItemAsync(AUTO_LOCK_MINUTES_KEY);
+    return value ? parseInt(value, 10) : null;
+  } catch (error) {
+    console.error('Error loading auto-lock minutes:', error);
+    return null;
+  }
+};
+
+export const setLastUnlockedTimestamp = async (timestamp: number): Promise<void> => {
+  try {
+    await SecureStore.setItemAsync(LAST_UNLOCKED_AT_KEY, timestamp.toString());
+  } catch (error) {
+    console.error('Error saving last unlocked timestamp:', error);
+  }
+};
+
+export const getLastUnlockedTimestamp = async (): Promise<number | null> => {
+  try {
+    const value = await SecureStore.getItemAsync(LAST_UNLOCKED_AT_KEY);
+    return value ? parseInt(value, 10) : null;
+  } catch (error) {
+    console.error('Error loading last unlocked timestamp:', error);
+    return null;
+  }
+};
+
+export const clearSecurityData = async (): Promise<void> => {
+  try {
+    await Promise.all([
+      SecureStore.deleteItemAsync(PASSWORD_HASH_KEY),
+      SecureStore.deleteItemAsync(AUTO_LOCK_MINUTES_KEY),
+      SecureStore.deleteItemAsync(LAST_UNLOCKED_AT_KEY),
+    ]);
+  } catch (error) {
+    console.error('Error clearing security data:', error);
   }
 };
 

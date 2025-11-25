@@ -21,6 +21,7 @@ export default function RootLayout() {
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         <Stack.Screen name="create-wallet" options={{ presentation: 'modal', title: 'Create Wallet' }} />
         <Stack.Screen name="import-wallet" options={{ presentation: 'modal', title: 'Import Wallet' }} />
+        <Stack.Screen name="set-password" options={{ presentation: 'modal', headerShown: false }} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>

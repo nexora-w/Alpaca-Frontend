@@ -13,7 +13,7 @@ const TOTAL_MNEMONIC_WORDS = 24;
 
 export default function ImportWalletScreen() {
   const dispatch = useAppDispatch();
-  const { loading, error, walletData } = useAppSelector((state) => state.wallet);
+  const { loading, walletData } = useAppSelector((state) => state.wallet);
   const [importMethod, setImportMethod] = useState<ImportMethod>('mnemonic');
   const [mnemonicWords, setMnemonicWords] = useState<string[]>(Array(TOTAL_MNEMONIC_WORDS).fill(''));
   const [privateKey, setPrivateKey] = useState('');
@@ -120,22 +120,22 @@ export default function ImportWalletScreen() {
           });
           Alert.alert(
             'Success',
-            'Wallet imported successfully!',
+            'Wallet imported successfully! Create a password next to secure it.',
             [
               {
-                text: 'OK',
-                onPress: () => router.replace('/wallet'),
+                text: 'Continue',
+                onPress: () => router.replace('/set-password'),
               },
             ]
           );
         }
         await dispatch(loadWalletFromStorage());
-        router.replace('/wallet');
+        router.replace('/set-password');
         return;
       }
 
       if (importWalletFromMnemonic.fulfilled.match(result)) {
-        router.replace('/wallet');
+        router.replace('/set-password');
       } else if (importWalletFromMnemonic.rejected.match(result)) {
         Alert.alert(
           'Error',
