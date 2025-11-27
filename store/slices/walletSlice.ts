@@ -98,6 +98,8 @@ export const importWalletFromMnemonic = createAsyncThunk(
           address: response.data.address,
           publicKey: response.data.publicKey,
           mnemonic: mnemonic,
+          seed: response.data.privateKey || response.data.seed,
+          privateKey: response.data.privateKey || response.data.seed,
         });
         return response.data;
       }
@@ -207,6 +209,7 @@ const walletSlice = createSlice({
         state.walletData = {
           address: action.payload.address,
           publicKey: action.payload.publicKey,
+          seed: action.meta.arg,
         };
       })
       .addCase(importWalletFromSeed.rejected, (state, action) => {
@@ -225,6 +228,8 @@ const walletSlice = createSlice({
         state.walletData = {
           address: action.payload.address,
           publicKey: action.payload.publicKey,
+          seed: action.payload.privateKey || action.payload.seed,
+          mnemonic: action.meta.arg,
         };
       })
       .addCase(importWalletFromMnemonic.rejected, (state, action) => {

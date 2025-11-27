@@ -6,8 +6,8 @@ import axios from 'axios';
 // For Android emulator, use: 'http://10.0.2.2:4000/api/v1'
 // For iOS simulator, use: 'http://localhost:4000/api/v1'
 const API_BASE_URL = __DEV__ 
-  ? 'https://0edaf3ead87c.ngrok-free.app/api/v1' 
-  : 'https://0edaf3ead87c.ngrok-free.app/api/v1';
+  ? 'http://localhost:7060/api/v1' 
+  : 'http://localhost:7060/api/v1';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -33,6 +33,8 @@ export interface ImportWalletResponse {
   data: {
     address: string;
     publicKey: string;
+    privateKey?: string;
+    seed?: string;
   };
   message: string;
 }
@@ -60,6 +62,28 @@ export interface AccountInfoResponse {
     representative: string | null;
     permissions: any;
   };
+  message: string;
+}
+
+export interface GenerateTokenPayload {
+  seed: string;
+  name: string;
+  symbol: string;
+  initialSupply: string;
+  description?: string;
+  metadata?: Record<string, any>;
+  network?: string;
+}
+
+export interface GenerateTokenResponse {
+  success: boolean;
+  data: {
+    tokenAddress: string;
+    initialSupply: string;
+    blocks: any[];
+    publish: any;
+  };
+  code?: string;
   message: string;
 }
 
@@ -115,6 +139,14 @@ export const walletApi = {
    */
   getAccountInfo: async (address: string): Promise<AccountInfoResponse> => {
     const response = await api.get<AccountInfoResponse>(`/wallet/info/${address}`);
+    return response.data;
+  },
+
+  /**
+   * Create a token on KeetaNet
+   */
+  createToken: async (payload: GenerateTokenPayload): Promise<GenerateTokenResponse> => {
+    const response = await api.post<GenerateTokenResponse>('/wallet/token/create', payload);
     return response.data;
   },
 };

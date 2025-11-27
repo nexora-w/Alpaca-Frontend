@@ -295,6 +295,32 @@ export default function WalletScreen() {
             <Text className="text-blue-500 font-semibold mt-2">Send</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Token tools */}
+        <View className="bg-white rounded-2xl p-5 border border-gray-200 mb-8">
+          <View className="flex-row items-center justify-between mb-4">
+            <View>
+              <Text className="text-lg font-semibold text-black">Token Tools</Text>
+              <Text className="text-sm text-gray-500">Create identifiers and manage supply</Text>
+            </View>
+            <Ionicons name="apps-outline" size={20} color="#111827" />
+          </View>
+          <TouchableOpacity
+            className="flex-row items-center justify-between bg-blue-50 border border-blue-200 rounded-2xl p-4"
+            onPress={() => router.push('/create-token')}
+          >
+            <View className="flex-row items-center">
+              <View className="w-10 h-10 rounded-full bg-blue-100 items-center justify-center mr-3">
+                <Ionicons name="add-circle-outline" size={22} color="#2563eb" />
+              </View>
+              <View>
+                <Text className="text-blue-600 font-semibold text-base">Create Token</Text>
+                <Text className="text-gray-500 text-xs">Mint a fungible token via KeetaNet</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#2563eb" />
+          </TouchableOpacity>
+        </View>
       </ScrollView>
 
       <Modal
