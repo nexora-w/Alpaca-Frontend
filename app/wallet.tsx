@@ -1,10 +1,14 @@
+import { walletApi } from '@/services/api';
+import { useToast } from '@/components/toast';
+import { TokenSkeleton } from '@/components/skeleton';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { deleteWalletData, fetchAccountBalance, loadWalletFromStorage, setRefreshing } from '@/store/slices/walletSlice';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Clipboard, Modal, RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Clipboard, Modal, RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
 import {
@@ -20,6 +24,7 @@ const AUTO_LOCK_OPTIONS = [1, 5, 15, 30, 60];
 export default function WalletScreen() {
   const dispatch = useAppDispatch();
   const router = useRouter();
+  const { showToast, currentToast } = useToast();
   const { walletData, balance, tokens, loading, refreshing } = useAppSelector((state) => state.wallet);
   const { locked, passwordSet, autoLockMinutes, initializing: securityInitializing } = useAppSelector(
     (state) => state.security
@@ -27,10 +32,17 @@ export default function WalletScreen() {
   const address = walletData?.address || null;
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [addressModalVisible, setAddressModalVisible] = useState(false);
+  const [sendModalVisible, setSendModalVisible] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [unlockError, setUnlockError] = useState('');
   const [unlockLoading, setUnlockLoading] = useState(false);
   const [autoLockSaving, setAutoLockSaving] = useState(false);
+  const [sendRecipient, setSendRecipient] = useState('');
+  const [sendAmount, setSendAmount] = useState('');
+  const [sendTokenAddress, setSendTokenAddress] = useState('');
+  const [sendError, setSendError] = useState('');
+  const [sending, setSending] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<{ recipient?: string; amount?: string }>({});
 
   const loadWalletData = useCallback(async () => {
     // Load wallet from storage first
@@ -75,9 +87,10 @@ export default function WalletScreen() {
   const copyToClipboard = (text: string, label: string) => {
     try {
       Clipboard.setString(text);
-      Alert.alert('Copied', `${label} copied to clipboard`);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      showToast(`${label} copied to clipboard`, 'success');
     } catch {
-      Alert.alert('Error', 'Failed to copy to clipboard');
+      showToast('Failed to copy to clipboard', 'error');
     }
   };
 
@@ -87,10 +100,15 @@ export default function WalletScreen() {
     return `${addr.slice(0, 6)}...${addr.slice(-6)}`;
   };
 
+  /**
+   * Format balance for display
+   * KeetaNetwork uses whole units, so we format as whole numbers with thousands separators
+   */
   const formatBalance = (bal: number | string) => {
     const num = typeof bal === 'string' ? parseFloat(bal) : bal;
-    if (isNaN(num)) return '0.00';
-    return num.toFixed(4);
+    if (isNaN(num) || num === 0) return '0';
+    // Format large numbers with commas for readability
+    return num.toLocaleString('en-US', { maximumFractionDigits: 0 });
   };
 
   const handleDeleteWallet = () => {
@@ -105,12 +123,15 @@ export default function WalletScreen() {
           onPress: async () => {
             try {
               setSettingsVisible(false);
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               await dispatch(deleteWalletData()).unwrap();
-              Alert.alert('Wallet Deleted', 'Your wallet has been removed from this device.');
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              showToast('Wallet deleted successfully', 'success');
               router.replace('/');
             } catch (error: any) {
               const message = typeof error === 'string' ? error : error?.message;
-              Alert.alert('Error', message || 'Failed to delete wallet');
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+              showToast(message || 'Failed to delete wallet', 'error');
             }
           },
         },
@@ -121,6 +142,7 @@ export default function WalletScreen() {
   const handleUnlockWallet = async () => {
     if (!passwordInput.trim()) {
       setUnlockError('Enter your password to continue');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       return;
     }
 
@@ -131,10 +153,12 @@ export default function WalletScreen() {
     if (unlockWalletWithPassword.fulfilled.match(result)) {
       setPasswordInput('');
       setUnlockError('');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast('Wallet unlocked', 'success');
     } else {
-      setUnlockError(
-        (result.payload as string) || 'Incorrect password. Please try again.'
-      );
+      const errorMsg = (result.payload as string) || 'Incorrect password. Please try again.';
+      setUnlockError(errorMsg);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
   };
 
@@ -144,38 +168,168 @@ export default function WalletScreen() {
     }
 
     setAutoLockSaving(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const result = await dispatch(updateAutoLockDuration(minutes));
     setAutoLockSaving(false);
 
-    if (updateAutoLockDuration.rejected.match(result)) {
-      Alert.alert('Error', (result.payload as string) || 'Failed to update auto-lock time.');
+    if (updateAutoLockDuration.fulfilled.match(result)) {
+      showToast(`Auto-lock set to ${minutes} minute${minutes === 1 ? '' : 's'}`, 'success');
+    } else if (updateAutoLockDuration.rejected.match(result)) {
+      showToast((result.payload as string) || 'Failed to update auto-lock time.', 'error');
     }
   };
 
   const handleShowAddress = () => {
     if (!address) {
-      Alert.alert('No Wallet', 'Please create or import a wallet first.');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      showToast('Please create or import a wallet first', 'warning');
       return;
     }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setAddressModalVisible(true);
   };
 
   const handleBackupWallet = () => {
     if (!walletData?.mnemonic && !walletData?.seed) {
-      Alert.alert('Unavailable', 'No seed phrase found for this wallet.');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      showToast('No seed phrase found for this wallet', 'warning');
       return;
     }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSettingsVisible(false);
     router.push('/backup-wallet');
   };
 
   const handleImmediateLock = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSettingsVisible(false);
     dispatch(forceLock());
+    showToast('Wallet locked', 'info');
+  };
+
+  const closeSendModal = () => {
+    if (sending) {
+      return;
+    }
+    setSendModalVisible(false);
+    setSendRecipient('');
+    setSendAmount('');
+    setSendTokenAddress('');
+    setSendError('');
+    setValidationErrors({});
+  };
+
+  const handleOpenSendModal = () => {
+    if (!address) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      showToast('Please create or import a wallet first', 'warning');
+      return;
+    }
+    const signerSecret = walletData?.seed || walletData?.privateKey;
+    if (!signerSecret) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      showToast('Unlock your wallet to send tokens', 'warning');
+      return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSendModalVisible(true);
+  };
+
+  const handlePrefillToken = (tokenAddr: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSendTokenAddress(tokenAddr);
+  };
+
+  // Validate send form
+  const validateSendForm = () => {
+    const errors: { recipient?: string; amount?: string } = {};
+    
+    if (!sendRecipient.trim()) {
+      errors.recipient = 'Recipient address is required';
+    } else if (sendRecipient.trim().length < 10) {
+      errors.recipient = 'Recipient address appears invalid';
+    }
+
+    if (!sendAmount.trim()) {
+      errors.amount = 'Amount is required';
+    } else {
+      const amountNum = parseFloat(sendAmount.trim());
+      if (isNaN(amountNum) || amountNum <= 0) {
+        errors.amount = 'Amount must be a positive number';
+      } else {
+        // Check if sending token or base token
+        const selectedToken = tokens.find(t => t.address === sendTokenAddress);
+        if (selectedToken) {
+          const tokenBalance = parseFloat(selectedToken.balance);
+          if (amountNum > tokenBalance) {
+            errors.amount = `Insufficient balance. Available: ${formatBalance(tokenBalance)}`;
+          }
+        } else if (sendTokenAddress.trim() === '') {
+          // Base token - check total balance
+          if (amountNum > balance) {
+            errors.amount = `Insufficient balance. Available: ${formatBalance(balance)}`;
+          }
+        }
+      }
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleSubmitSend = async () => {
+    const signerSecret = walletData?.seed || walletData?.privateKey;
+    if (!signerSecret) {
+      setSendError('Wallet seed is required to sign transfers.');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      return;
+    }
+
+    if (!validateSendForm()) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      return;
+    }
+
+    setSending(true);
+    setSendError('');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    try {
+      const response = await walletApi.transferTokens({
+        seed: signerSecret.trim(),
+        recipient: sendRecipient.trim(),
+        amount: sendAmount.trim(),
+        tokenAddress: sendTokenAddress.trim() || undefined,
+        network: "main"
+      });
+
+      if (!response.success) {
+        throw new Error(response.message || 'Transfer failed');
+      }
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast(
+        `Successfully sent ${formatBalance(response.data.amount)} units`,
+        'success',
+        4000
+      );
+      closeSendModal();
+      if (address) {
+        dispatch(fetchAccountBalance(address));
+      }
+    } catch (error: any) {
+      const message = error?.response?.data?.message || error?.message || 'Failed to send tokens';
+      setSendError(message);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showToast(message, 'error');
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
     <View className="flex-1 bg-blue-50">
+      {currentToast}
       <ScrollView
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -225,8 +379,10 @@ export default function WalletScreen() {
           </Text>
           
           {loading ? (
-            <View className="bg-white rounded-lg p-6 items-center">
-              <Text className="text-gray-500">Loading tokens...</Text>
+            <View>
+              <TokenSkeleton />
+              <TokenSkeleton />
+              <TokenSkeleton />
             </View>
           ) : tokens.length === 0 ? (
             <View className="bg-white rounded-lg p-6 items-center border border-gray-200">
@@ -240,39 +396,42 @@ export default function WalletScreen() {
             </View>
           ) : (
             <View>
-              {tokens.map((token: any, index: number) => (
-                <TouchableOpacity
-                  key={`${token.address}-${index}`}
-                  className="bg-white rounded-lg p-4 border border-gray-200 flex-row items-center justify-between mb-3"
-                  onPress={() => copyToClipboard(token.address, 'Token Address')}
-                >
-                  <View className="flex-1">
-                    <View className="flex-row items-center mb-1">
-                      <View className="w-10 h-10 bg-blue-100 rounded-full items-center justify-center mr-3">
-                        <Text className="text-blue-600 font-bold text-sm">
-                          {token.address.slice(0, 2).toUpperCase()}
-                        </Text>
-                      </View>
-                      <View className="flex-1">
-                        <Text className="text-black font-semibold text-base">
-                          Token {index + 1}
-                        </Text>
-                        <Text className="text-gray-500 text-xs font-mono">
-                          {formatAddress(token.address)}
-                        </Text>
+              {tokens.map((token: any, index: number) => {
+                const tokenAddress = token.address || '';
+                return (
+                  <TouchableOpacity
+                    key={`${tokenAddress}-${index}`}
+                    className="bg-white rounded-lg p-4 border border-gray-200 flex-row items-center justify-between mb-3"
+                    onPress={() => copyToClipboard(tokenAddress, 'Token Address')}
+                  >
+                    <View className="flex-1">
+                      <View className="flex-row items-center mb-1">
+                        <View className="w-10 h-10 bg-blue-100 rounded-full items-center justify-center mr-3">
+                          <Text className="text-blue-600 font-bold text-sm">
+                            {tokenAddress ? tokenAddress.slice(0, 2).toUpperCase() : '??'}
+                          </Text>
+                        </View>
+                        <View className="flex-1">
+                          <Text className="text-black font-semibold text-base">
+                            Token {index + 1}
+                          </Text>
+                          <Text className="text-gray-500 text-xs font-mono">
+                            {formatAddress(tokenAddress)}
+                          </Text>
+                        </View>
                       </View>
                     </View>
-                  </View>
-                  <View className="items-end">
-                    <Text className="text-black font-semibold text-base">
-                      {formatBalance(token.balance)}
-                    </Text>
-                    <Text className="text-gray-400 text-xs">
-                      Balance
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
+                    <View className="items-end">
+                      <Text className="text-black font-semibold text-base">
+                        {formatBalance(token.balance)}
+                      </Text>
+                      <Text className="text-gray-400 text-xs">
+                        Balance
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           )}
         </View>
@@ -290,6 +449,9 @@ export default function WalletScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             className="flex-1 bg-white rounded-lg p-4 items-center ml-2 border border-gray-200"
+            onPress={handleOpenSendModal}
+            disabled={!address}
+            style={{ opacity: address ? 1 : 0.5 }}
           >
             <Ionicons name="arrow-up-outline" size={24} color="#2196F3" />
             <Text className="text-blue-500 font-semibold mt-2">Send</Text>
@@ -367,6 +529,183 @@ export default function WalletScreen() {
                 No wallet address available. Please create or import a wallet.
               </Text>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={sendModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={closeSendModal}
+      >
+        <View className="flex-1 justify-end">
+          <TouchableOpacity
+            className="flex-1 bg-black/40"
+            activeOpacity={1}
+            onPress={closeSendModal}
+          />
+          <View className="bg-white rounded-t-3xl p-6">
+            <View className="flex-row justify-between items-center mb-4">
+              <Text className="text-xl font-semibold text-black">
+                Send Tokens
+              </Text>
+              <TouchableOpacity onPress={closeSendModal}>
+                <Ionicons name="close" size={24} color="#111827" />
+              </TouchableOpacity>
+            </View>
+
+            <View className="mb-4">
+              <Text className="text-xs font-semibold text-gray-600 mb-2">
+                Recipient Address
+              </Text>
+              <TextInput
+                className={`border rounded-2xl px-4 py-3 text-sm text-gray-900 ${
+                  validationErrors.recipient ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                }`}
+                placeholder="Enter recipient address"
+                placeholderTextColor="#9CA3AF"
+                autoCapitalize="none"
+                value={sendRecipient}
+                onChangeText={(text) => {
+                  setSendRecipient(text);
+                  if (sendError) setSendError('');
+                  if (validationErrors.recipient) {
+                    setValidationErrors({ ...validationErrors, recipient: undefined });
+                  }
+                }}
+                onBlur={validateSendForm}
+                editable={!sending}
+              />
+              {validationErrors.recipient && (
+                <Text className="text-xs text-red-600 mt-1">{validationErrors.recipient}</Text>
+              )}
+            </View>
+
+            <View className="mb-4">
+              <View className="flex-row items-center justify-between mb-2">
+                <Text className="text-xs font-semibold text-gray-600">
+                  Amount (whole units)
+                </Text>
+                {sendTokenAddress.trim() === '' && balance > 0 && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      setSendAmount(balance.toString());
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }}
+                    disabled={sending}
+                  >
+                    <Text className="text-xs text-blue-500 font-semibold">Max</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              <TextInput
+                className={`border rounded-2xl px-4 py-3 text-sm text-gray-900 ${
+                  validationErrors.amount ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                }`}
+                placeholder="Enter amount"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="numeric"
+                value={sendAmount}
+                onChangeText={(text) => {
+                  setSendAmount(text.replace(/[^0-9]/g, ''));
+                  if (sendError) setSendError('');
+                  if (validationErrors.amount) {
+                    setValidationErrors({ ...validationErrors, amount: undefined });
+                  }
+                }}
+                onBlur={validateSendForm}
+                editable={!sending}
+              />
+              {validationErrors.amount && (
+                <Text className="text-xs text-red-600 mt-1">{validationErrors.amount}</Text>
+              )}
+              {!validationErrors.amount && sendAmount && (
+                <Text className="text-xs text-gray-500 mt-1">
+                  Available: {formatBalance(
+                    sendTokenAddress.trim() 
+                      ? tokens.find(t => t.address === sendTokenAddress)?.balance || '0'
+                      : balance.toString()
+                  )}
+                </Text>
+              )}
+            </View>
+
+            <View className="mb-4">
+              <Text className="text-xs font-semibold text-gray-600 mb-2">
+                Token Address (optional)
+              </Text>
+              <TextInput
+                className="border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-900"
+                placeholder="Leave blank for base token"
+                placeholderTextColor="#9CA3AF"
+                autoCapitalize="none"
+                value={sendTokenAddress}
+                onChangeText={(text) => {
+                  setSendTokenAddress(text);
+                  if (sendError) setSendError('');
+                }}
+                editable={!sending}
+              />
+              <Text className="text-xs text-gray-500 mt-2">
+                Tap a token below to autofill or leave empty to send KTA.
+              </Text>
+            </View>
+
+            {tokens.length > 0 && (
+              <View className="mb-4">
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {tokens.map((token: any) => {
+                    const tokenAddress = token.address || '';
+                    return (
+                      <TouchableOpacity
+                        key={tokenAddress}
+                        className={`mr-3 px-3 py-2 rounded-2xl border ${
+                          sendTokenAddress === tokenAddress ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-gray-50'
+                        }`}
+                        onPress={() => handlePrefillToken(tokenAddress)}
+                        disabled={sending}
+                      >
+                        <Text className="text-xs font-mono text-gray-700">
+                          {formatAddress(tokenAddress)}
+                        </Text>
+                        <Text className="text-[10px] text-gray-500">
+                          Bal: {formatBalance(token.balance)}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
+
+            {sendError ? (
+              <Text className="text-xs text-red-600 mb-3">{sendError}</Text>
+            ) : null}
+
+            <TouchableOpacity
+              className={`rounded-2xl py-4 items-center ${
+                Object.keys(validationErrors).length > 0 || sending
+                  ? 'bg-gray-400'
+                  : 'bg-blue-500'
+              }`}
+              onPress={handleSubmitSend}
+              disabled={sending || Object.keys(validationErrors).length > 0}
+              style={{ opacity: sending || Object.keys(validationErrors).length > 0 ? 0.7 : 1 }}
+            >
+              {sending ? (
+                <View className="flex-row items-center">
+                  <ActivityIndicator color="#fff" size="small" />
+                  <Text className="text-white font-semibold text-base ml-2">
+                    Sending...
+                  </Text>
+                </View>
+              ) : (
+                <Text className="text-white font-semibold text-base">
+                  Send Tokens
+                </Text>
+              )}
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>

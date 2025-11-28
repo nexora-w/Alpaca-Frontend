@@ -1,7 +1,9 @@
 import { walletApi } from '@/services/api';
+import { useToast } from '@/components/toast';
 import { useAppSelector } from '@/store/hooks';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -30,6 +32,7 @@ const describeError = (code?: string, fallback?: string) => {
 
 export default function CreateTokenScreen() {
   const router = useRouter();
+  const { showToast, currentToast } = useToast();
   const { walletData } = useAppSelector((state) => state.wallet);
   const storedSeed = walletData?.seed || walletData?.privateKey || '';
   const [seedOverride, setSeedOverride] = useState('');
@@ -55,9 +58,10 @@ export default function CreateTokenScreen() {
   const handleCopy = async (value: string) => {
     try {
       await Clipboard.setStringAsync(value);
-      Alert.alert('Copied', 'Token address copied to clipboard.');
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      showToast('Token address copied to clipboard', 'success');
     } catch {
-      Alert.alert('Error', 'Failed to copy address');
+      showToast('Failed to copy address', 'error');
     }
   };
 
@@ -96,6 +100,7 @@ export default function CreateTokenScreen() {
 
     try {
       setLoading(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       const response = await walletApi.createToken({
         seed: resolvedSeed,
         name: name.trim(),
@@ -111,7 +116,8 @@ export default function CreateTokenScreen() {
           tokenAddress: response.data.tokenAddress,
           initialSupply: response.data.initialSupply,
         });
-        Alert.alert('Success', 'Token submitted to KeetaNet representatives.');
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        showToast('Token created successfully!', 'success', 4000);
       } else {
         setError(response.message || 'Failed to create token.');
         setErrorCode((response as any).code);
@@ -122,7 +128,8 @@ export default function CreateTokenScreen() {
       const code = err.response?.data?.code;
       setError(message);
       setErrorCode(code);
-       showErrorAlert(code, message);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showErrorAlert(code, message);
     } finally {
       setLoading(false);
     }
@@ -130,6 +137,7 @@ export default function CreateTokenScreen() {
 
   return (
     <View className="flex-1 bg-blue-50">
+      {currentToast}
       <ScrollView
         contentContainerStyle={{
           padding: 20,

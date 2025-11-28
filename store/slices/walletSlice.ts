@@ -33,6 +33,43 @@ const initialState: WalletState = {
   refreshing: false,
 };
 
+/**
+ * Normalize balance value to string representation
+ * KeetaNetwork uses whole units (BigInt) directly, not decimal-based units
+ * @param balance - Balance value (string, number, or null)
+ * @param balanceHex - Optional hex balance value
+ * @returns String representation of the balance as whole units
+ */
+const normalizeBalanceValue = (balance?: string | number | null, balanceHex?: string): string => {
+  const rawValue = balance ?? balanceHex;
+  if (rawValue === undefined || rawValue === null) {
+    return '0';
+  }
+
+  try {
+    let bigintValue: bigint;
+    if (typeof rawValue === 'number') {
+      bigintValue = BigInt(Math.trunc(rawValue));
+    } else if (typeof rawValue === 'string') {
+      const trimmed = rawValue.trim();
+      if (!trimmed) {
+        return '0';
+      }
+      // Handle hex values (0x prefix) or decimal strings
+      bigintValue = trimmed.startsWith('0x') ? BigInt(trimmed) : BigInt(trimmed);
+    } else if (typeof rawValue === 'bigint') {
+      bigintValue = rawValue;
+    } else {
+      return '0';
+    }
+
+    // KeetaNetwork uses whole units directly, no decimal conversion needed
+    return bigintValue.toString();
+  } catch {
+    return '0';
+  }
+};
+
 // Async thunks
 export const loadWalletFromStorage = createAsyncThunk(
   'wallet/loadFromStorage',
@@ -116,9 +153,18 @@ export const fetchAccountBalance = createAsyncThunk(
     try {
       const response = await walletApi.getAccountBalance(address);
       if (response.success && response.data) {
+        const normalizedTotal = normalizeBalanceValue(response.data.totalBalance);
+        // Transform tokens from API format to our Token interface
+        const transformedTokens = (response.data.tokens || []).map((token: any) => ({
+          address: token.token || token.address,
+          balance: normalizeBalanceValue(token.balance, token.balanceHex),
+        }));
+        // Parse as float for display, but keep as string in tokens array for precision
+        // KeetaNetwork uses whole units, so we can safely parse for display
+        const totalBalanceNum = parseFloat(normalizedTotal) || 0;
         return {
-          balance: response.data.totalBalance,
-          tokens: response.data.tokens || [],
+          balance: totalBalanceNum,
+          tokens: transformedTokens,
         };
       }
       throw new Error('Failed to fetch balance');

@@ -87,6 +87,27 @@ export interface GenerateTokenResponse {
   message: string;
 }
 
+export interface TransferPayload {
+  seed: string;
+  recipient: string;
+  amount: string;
+  tokenAddress?: string;
+  network?: string;
+}
+
+export interface TransferResponse {
+  success: boolean;
+  data: {
+    recipient: string;
+    amount: string;
+    tokenAddress: string | null;
+    blocks: any[];
+    publish: any;
+  };
+  code?: string;
+  message: string;
+}
+
 export const walletApi = {
   /**
    * Create a new wallet using KeetaNet SDK
@@ -147,6 +168,14 @@ export const walletApi = {
    */
   createToken: async (payload: GenerateTokenPayload): Promise<GenerateTokenResponse> => {
     const response = await api.post<GenerateTokenResponse>('/wallet/token/create', payload);
+    return response.data;
+  },
+
+  /**
+   * Transfer tokens using the backend relay
+   */
+  transferTokens: async (payload: TransferPayload): Promise<TransferResponse> => {
+    const response = await api.post<TransferResponse>('/wallet/transfer', payload);
     return response.data;
   },
 };
